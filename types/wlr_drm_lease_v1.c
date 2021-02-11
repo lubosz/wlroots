@@ -20,7 +20,7 @@
 #include "util/shm.h"
 #include "util/signal.h"
 
-static struct zwp_drm_lease_manager_v1_interface lease_manager_impl;
+static struct zwp_drm_lease_device_v1_interface lease_device_impl;
 static struct zwp_drm_lease_request_v1_interface lease_request_impl;
 static struct zwp_drm_lease_connector_v1_interface lease_connector_impl;
 static struct zwp_drm_lease_v1_interface lease_impl;
@@ -29,10 +29,10 @@ static void drm_lease_connector_v1_send_to_client(
 		struct wlr_drm_lease_connector_v1 *connector,
 		struct wl_client *wl_client, struct wl_resource *manager);
 
-static struct wlr_drm_lease_manager_v1 *wlr_drm_lease_manager_v1_from_resource(
+static struct wlr_drm_lease_device_v1 *wlr_drm_lease_device_v1_from_resource(
 		struct wl_resource *resource) {
 	assert(wl_resource_instance_of(resource,
-				&zwp_drm_lease_manager_v1_interface, &lease_manager_impl));
+				&zwp_drm_lease_device_v1_interface, &lease_device_impl));
 	return wl_resource_get_user_data(resource);
 }
 
@@ -77,11 +77,11 @@ static void lease_terminated_by_drm(
 	wlr_log(WLR_DEBUG, "Lease terminated by DRM");
 	struct wlr_drm_lease_v1 *lease = data;
 	lease->lessee_id = 0;
-	wlr_drm_lease_manager_v1_revoke_lease(lease->manager, lease);
+	wlr_drm_lease_device_v1_revoke_lease(lease->manager, lease);
 }
 
-struct wlr_drm_lease_v1 *wlr_drm_lease_manager_v1_grant_lease_request(
-		struct wlr_drm_lease_manager_v1 *manager,
+struct wlr_drm_lease_v1 *wlr_drm_lease_device_v1_grant_lease_request(
+		struct wlr_drm_lease_device_v1 *manager,
 		struct wlr_drm_lease_request_v1 *request) {
 	assert(manager && request);
 	assert(request->lease);
@@ -139,8 +139,8 @@ struct wlr_drm_lease_v1 *wlr_drm_lease_manager_v1_grant_lease_request(
 	return lease;
 }
 
-void wlr_drm_lease_manager_v1_reject_lease_request(
-		struct wlr_drm_lease_manager_v1 *manager,
+void wlr_drm_lease_device_v1_reject_lease_request(
+		struct wlr_drm_lease_device_v1 *manager,
 		struct wlr_drm_lease_request_v1 *request) {
 	assert(manager && request);
 	assert(request->lease);
@@ -148,8 +148,8 @@ void wlr_drm_lease_manager_v1_reject_lease_request(
 	request->invalid = true;
 }
 
-void wlr_drm_lease_manager_v1_revoke_lease(
-		struct wlr_drm_lease_manager_v1 *manager,
+void wlr_drm_lease_device_v1_revoke_lease(
+		struct wlr_drm_lease_device_v1 *manager,
 		struct wlr_drm_lease_v1 *lease) {
 	assert(manager && lease);
 	if (lease->resource != NULL) {
@@ -177,7 +177,7 @@ void wlr_drm_lease_manager_v1_revoke_lease(
 }
 
 static void drm_lease_v1_destroy(struct wlr_drm_lease_v1 *lease) {
-	wlr_drm_lease_manager_v1_revoke_lease(lease->manager, lease);
+	wlr_drm_lease_device_v1_revoke_lease(lease->manager, lease);
 	free(lease);
 }
 
@@ -296,30 +296,30 @@ static struct zwp_drm_lease_request_v1_interface lease_request_impl = {
 	.submit = drm_lease_request_v1_handle_submit,
 };
 
-static void drm_lease_manager_v1_validate_destroy(
-		struct wlr_drm_lease_manager_v1 *manager, struct wl_client *client) {
+static void drm_lease_device_v1_validate_destroy(
+		struct wlr_drm_lease_device_v1 *manager, struct wl_client *client) {
 	// TODO: send protocol error if there are any bound resources
 }
 
-static void drm_lease_manager_v1_handle_resource_destroy(
+static void drm_lease_device_v1_handle_resource_destroy(
 		struct wl_resource *resource) {
-	drm_lease_manager_v1_validate_destroy(
-			wlr_drm_lease_manager_v1_from_resource(resource),
+	drm_lease_device_v1_validate_destroy(
+			wlr_drm_lease_device_v1_from_resource(resource),
 			wl_resource_get_client(resource));
 	wl_list_remove(wl_resource_get_link(resource));
 	wl_list_init(wl_resource_get_link(resource));
 }
 
-static void drm_lease_manager_v1_handle_stop(
+static void drm_lease_device_v1_handle_stop(
 		struct wl_client *client, struct wl_resource *resource) {
-	zwp_drm_lease_manager_v1_send_finished(resource);
+	zwp_drm_lease_device_v1_send_finished(resource);
 	wl_resource_destroy(resource);
 }
 
-static void drm_lease_manager_v1_handle_create_lease_request(
+static void drm_lease_device_v1_handle_create_lease_request(
 		struct wl_client *client, struct wl_resource *resource, uint32_t id) {
-	struct wlr_drm_lease_manager_v1 *manager =
-		wlr_drm_lease_manager_v1_from_resource(resource);
+	struct wlr_drm_lease_device_v1 *manager =
+		wlr_drm_lease_device_v1_from_resource(resource);
 
 	struct wlr_drm_lease_request_v1 *req =
 		calloc(1, sizeof(struct wlr_drm_lease_request_v1));
@@ -346,9 +346,9 @@ static void drm_lease_manager_v1_handle_create_lease_request(
 	wl_list_insert(&manager->lease_requests, wl_resource_get_link(wl_resource));
 }
 
-static struct zwp_drm_lease_manager_v1_interface lease_manager_impl = {
-	.stop = drm_lease_manager_v1_handle_stop,
-	.create_lease_request = drm_lease_manager_v1_handle_create_lease_request,
+static struct zwp_drm_lease_device_v1_interface lease_device_impl = {
+	.stop = drm_lease_device_v1_handle_stop,
+	.create_lease_request = drm_lease_device_v1_handle_create_lease_request,
 };
 
 static void drm_connector_v1_handle_resource_destroy(
@@ -377,7 +377,7 @@ static void drm_lease_connector_v1_send_to_client(
 			&zwp_drm_lease_connector_v1_interface, 1, 0);
 	wl_resource_set_implementation(wl_resource, &lease_connector_impl,
 			connector, drm_connector_v1_handle_resource_destroy);
-	zwp_drm_lease_manager_v1_send_connector(manager, wl_resource);
+	zwp_drm_lease_device_v1_send_connector(manager, wl_resource);
 
 	struct wlr_output *output = connector->output;
 	zwp_drm_lease_connector_v1_send_name(wl_resource, output->name);
@@ -393,22 +393,22 @@ static void drm_lease_connector_v1_send_to_client(
 	wl_list_insert(&connector->resources, wl_resource_get_link(wl_resource));
 }
 
-static void lease_manager_bind(struct wl_client *wl_client, void *data,
+static void lease_device_bind(struct wl_client *wl_client, void *data,
 		uint32_t version, uint32_t id) {
-	struct wlr_drm_lease_manager_v1 *lease_manager = data;
+	struct wlr_drm_lease_device_v1 *lease_device = data;
 
 	struct wl_resource *wl_resource  = wl_resource_create(wl_client,
-		&zwp_drm_lease_manager_v1_interface, version, id);
+		&zwp_drm_lease_device_v1_interface, version, id);
 
 	if (!wl_resource) {
 		wl_client_post_no_memory(wl_client);
 		return;
 	}
 
-	wl_resource_set_implementation(wl_resource, &lease_manager_impl,
-		lease_manager, drm_lease_manager_v1_handle_resource_destroy);
+	wl_resource_set_implementation(wl_resource, &lease_device_impl,
+		lease_device, drm_lease_device_v1_handle_resource_destroy);
 
-	char *path = drmGetDeviceNameFromFd2(lease_manager->backend->fd);
+	char *path = drmGetDeviceNameFromFd2(lease_device->backend->fd);
 	int fd = open(path, O_RDWR);
 	if (fd < 0) {
 		wlr_log_errno(WLR_ERROR, "Unable to clone DRM fd for leasing.\n");
@@ -418,23 +418,23 @@ static void lease_manager_bind(struct wl_client *wl_client, void *data,
 			drmDropMaster(fd);
 		}
 		assert(!drmIsMaster(fd) && "Won't send master fd to client");
-		zwp_drm_lease_manager_v1_send_drm_fd(wl_resource, fd);
+		zwp_drm_lease_device_v1_send_drm_fd(wl_resource, fd);
 		free(path);
 		close(fd);
 	}
 
-	wl_list_insert(&lease_manager->resources,
+	wl_list_insert(&lease_device->resources,
 			wl_resource_get_link(wl_resource));
 
 	struct wlr_drm_lease_connector_v1 *connector;
-	wl_list_for_each(connector, &lease_manager->connectors, link) {
+	wl_list_for_each(connector, &lease_device->connectors, link) {
 		drm_lease_connector_v1_send_to_client(
 				connector, wl_client, wl_resource);
 	}
 }
 
-void wlr_drm_lease_manager_v1_offer_output(
-		struct wlr_drm_lease_manager_v1 *manager, struct wlr_output *output) {
+void wlr_drm_lease_device_v1_offer_output(
+		struct wlr_drm_lease_device_v1 *manager, struct wlr_output *output) {
 	assert(manager && output);
 	assert(wlr_output_is_drm(output));
 	struct wlr_drm_connector *drm_connector =
@@ -467,8 +467,8 @@ void wlr_drm_lease_manager_v1_offer_output(
 	}
 }
 
-void wlr_drm_lease_manager_v1_widthraw_output(
-		struct wlr_drm_lease_manager_v1 *manager, struct wlr_output *output) {
+void wlr_drm_lease_device_v1_widthraw_output(
+		struct wlr_drm_lease_device_v1 *manager, struct wlr_output *output) {
 	struct wlr_drm_lease_connector_v1 *connector = NULL, *_connector;
 	wl_list_for_each(_connector, &manager->connectors, link) {
 		if (_connector->output == output) {
@@ -508,7 +508,7 @@ static void multi_backend_cb(struct wlr_backend *backend, void *data) {
 }
 
 static void handle_display_destroy(struct wl_listener *listener, void *data) {
-	struct wlr_drm_lease_manager_v1 *manager =
+	struct wlr_drm_lease_device_v1 *manager =
 		wl_container_of(listener, manager, display_destroy);
 	struct wl_resource *resource;
 	struct wl_resource *tmp_resource;
@@ -524,7 +524,7 @@ static void handle_display_destroy(struct wl_listener *listener, void *data) {
 	wl_resource_for_each_safe(resource, tmp_resource, &manager->leases) {
 		struct wlr_drm_lease_v1 *lease =
 			wlr_drm_lease_v1_from_resource(resource);
-		wlr_drm_lease_manager_v1_revoke_lease(manager, lease);
+		wlr_drm_lease_device_v1_revoke_lease(manager, lease);
 	}
 
 	struct wlr_drm_lease_connector_v1 *connector, *tmp_connector;
@@ -538,7 +538,7 @@ static void handle_display_destroy(struct wl_listener *listener, void *data) {
 	free(manager);
 }
 
-struct wlr_drm_lease_manager_v1 *wlr_drm_lease_manager_v1_create(
+struct wlr_drm_lease_device_v1 *wlr_drm_lease_device_v1_create(
 		struct wl_display *display, struct wlr_backend *backend) {
 	assert(display);
 
@@ -551,32 +551,32 @@ struct wlr_drm_lease_manager_v1 *wlr_drm_lease_manager_v1_create(
 		return NULL;
 	}
 
-	struct wlr_drm_lease_manager_v1 *lease_manager =
-		calloc(1, sizeof(struct wlr_drm_lease_manager_v1));
+	struct wlr_drm_lease_device_v1 *lease_device =
+		calloc(1, sizeof(struct wlr_drm_lease_device_v1));
 
-	if (!lease_manager) {
+	if (!lease_device) {
 		return NULL;
 	}
 
-	lease_manager->backend = get_drm_backend_from_backend(backend);
-	wl_list_init(&lease_manager->resources);
-	wl_list_init(&lease_manager->connectors);
-	wl_list_init(&lease_manager->lease_requests);
-	wl_list_init(&lease_manager->leases);
+	lease_device->backend = get_drm_backend_from_backend(backend);
+	wl_list_init(&lease_device->resources);
+	wl_list_init(&lease_device->connectors);
+	wl_list_init(&lease_device->lease_requests);
+	wl_list_init(&lease_device->leases);
 
-	wl_signal_init(&lease_manager->events.lease_requested);
+	wl_signal_init(&lease_device->events.lease_requested);
 
-	lease_manager->display_destroy.notify = handle_display_destroy;
-	wl_display_add_destroy_listener(display, &lease_manager->display_destroy);
+	lease_device->display_destroy.notify = handle_display_destroy;
+	wl_display_add_destroy_listener(display, &lease_device->display_destroy);
 
-	lease_manager->global = wl_global_create(display,
-		&zwp_drm_lease_manager_v1_interface, 1,
-		lease_manager, lease_manager_bind);
+	lease_device->global = wl_global_create(display,
+		&zwp_drm_lease_device_v1_interface, 1,
+		lease_device, lease_device_bind);
 
-	if (!lease_manager->global) {
-		free(lease_manager);
+	if (!lease_device->global) {
+		free(lease_device);
 		return NULL;
 	}
 
-	return lease_manager;
+	return lease_device;
 }
